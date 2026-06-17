@@ -117,12 +117,9 @@ export default function Room({ roomId, nickname, isHost: initialHost, onLeave })
 
   const { send } = useSocket(handleMessage);
 
-  // Join room on mount
+  // Join room on mount — send immediately, useSocket queues if WS not open
   useEffect(() => {
-    const timer = setTimeout(() => {
-      send({ type: 'JOIN', roomId, nickname });
-    }, 300);
-    return () => clearTimeout(timer);
+    send({ type: 'JOIN', roomId, nickname });
   }, [roomId, nickname, send]);
 
   // ── Player event handlers ──
