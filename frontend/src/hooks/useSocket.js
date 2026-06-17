@@ -8,6 +8,19 @@ export function useSocket(onMessage) {
   onMessageRef.current = onMessage;
 
   const reconnectTimer = useRef(null);
+  const pendingQueue = useRef([]); // messages queued before WS opens
+  const onOpenCallbacks = useRef([]); // callbacks to fire on open
+
+  const flushQueue = useCallback(() => {
+    while (pendingQueue.current.length > 0) {
+      const msg = pendingQueue.current.shift();
+      if (ws.current?.readyState === WebSocket.OPEN) {
+        ws.current.send(JSON.stringify(msg));
+      }
+    }
+    const cbs = onOpenCallbacks.current.splice(0);
+    cbs.forEach(cb => cb());
+  }, []);
 
   const connect = useCallback(() => {
     if (ws.current?.readyState === WebSocket.OPEN) return;
@@ -16,7 +29,8 @@ export function useSocket(onMessage) {
 
     ws.current.onopen = () => {
       console.log('[WS] connected');
-      clearInterval(reconnectTimer.current);
+      clearTimeout(reconnectTimer.current);
+      flushQueue();
     };
 
     ws.current.onmessage = (e) => {
@@ -32,7 +46,7 @@ export function useSocket(onMessage) {
     };
 
     ws.current.onerror = () => ws.current?.close();
-  }, []);
+  }, [flushQueue]);
 
   useEffect(() => {
     connect();
@@ -48,9 +62,12 @@ export function useSocket(onMessage) {
     };
   }, [connect]);
 
+  // send: if WS open → send immediately, else queue
   const send = useCallback((msg) => {
     if (ws.current?.readyState === WebSocket.OPEN) {
       ws.current.send(JSON.stringify(msg));
+    } else {
+      pendingQueue.current.push(msg);
     }
   }, []);
 
