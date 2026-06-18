@@ -205,8 +205,9 @@ wss.on('connection', (ws) => {
 
       case 'JOIN': {
         const roomId = msg.roomId?.toUpperCase();
+        console.log('[JOIN] roomId:', roomId, 'nickname:', msg.nickname);
         const room = rooms.get(roomId);
-        if (!room) { ws.send(JSON.stringify({ type: 'ERROR', text: 'Room not found' })); return; }
+        if (!room) { console.log('[JOIN] room not found:', roomId, 'available:', [...rooms.keys()]); ws.send(JSON.stringify({ type: 'ERROR', text: 'Room not found' })); return; }
 
         meta.roomId = roomId;
         meta.nickname = msg.nickname || 'Guest';
@@ -231,8 +232,9 @@ wss.on('connection', (ws) => {
       }
 
       case 'ADD_TRACK': {
+        console.log('[ADD_TRACK] roomId:', meta.roomId, 'url:', msg.url?.slice(0,50));
         const room = rooms.get(meta.roomId);
-        if (!room) return;
+        if (!room) { console.log('[ADD_TRACK] room not found for:', meta.roomId); return; }
 
         const trackId = uuidv4();
         const track = {
