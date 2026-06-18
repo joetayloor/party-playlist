@@ -115,12 +115,17 @@ export default function Room({ roomId, nickname, isHost: initialHost, onLeave })
     }
   }, [nickname, showToast]);
 
-  const { send } = useSocket(handleMessage);
+  const { send, onReconnect } = useSocket(handleMessage);
 
-  // Join room on mount — send immediately, useSocket queues if WS not open
+  // Join room on mount AND on every reconnect
   useEffect(() => {
-    send({ type: 'JOIN', roomId, nickname });
-  }, [roomId, nickname, send]);
+    const doJoin = () => {
+      console.log('[JOIN] sending join for room', roomId);
+      send({ type: 'JOIN', roomId, nickname });
+    };
+    onReconnect(doJoin);
+    doJoin();
+  }, [roomId, nickname, send, onReconnect]);
 
   // ── Player event handlers ──
   function handlePlay(currentTime) {
