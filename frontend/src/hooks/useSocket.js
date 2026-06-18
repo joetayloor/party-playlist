@@ -8,18 +8,19 @@ export function useSocket(onMessage) {
   onMessageRef.current = onMessage;
 
   const reconnectTimer = useRef(null);
-  const pendingQueue = useRef([]); // messages queued before WS opens
-  const onOpenCallbacks = useRef([]); // callbacks to fire on open
+  const pendingQueue = useRef([]);
+  const onReconnectRef = useRef(null); // called every time WS (re)opens
 
   const flushQueue = useCallback(() => {
+    // Fire reconnect callback first (e.g. re-send JOIN)
+    if (onReconnectRef.current) onReconnectRef.current();
+
     while (pendingQueue.current.length > 0) {
       const msg = pendingQueue.current.shift();
       if (ws.current?.readyState === WebSocket.OPEN) {
         ws.current.send(JSON.stringify(msg));
       }
     }
-    const cbs = onOpenCallbacks.current.splice(0);
-    cbs.forEach(cb => cb());
   }, []);
 
   const connect = useCallback(() => {
@@ -50,11 +51,12 @@ export function useSocket(onMessage) {
 
   useEffect(() => {
     connect();
+    // Ping every 25s to keep connection alive on Railway
     const ping = setInterval(() => {
       if (ws.current?.readyState === WebSocket.OPEN) {
         ws.current.send(JSON.stringify({ type: 'PING' }));
       }
-    }, 20000);
+    }, 25000);
     return () => {
       clearInterval(ping);
       clearTimeout(reconnectTimer.current);
@@ -62,7 +64,6 @@ export function useSocket(onMessage) {
     };
   }, [connect]);
 
-  // send: if WS open → send immediately, else queue
   const send = useCallback((msg) => {
     if (ws.current?.readyState === WebSocket.OPEN) {
       ws.current.send(JSON.stringify(msg));
@@ -71,5 +72,10 @@ export function useSocket(onMessage) {
     }
   }, []);
 
-  return { send };
+  // Register a callback to re-run on every reconnect (e.g. re-JOIN)
+  const onReconnect = useCallback((cb) => {
+    onReconnectRef.current = cb;
+  }, []);
+
+  return { send, onReconnect };
 }
